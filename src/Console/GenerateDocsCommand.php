@@ -8,11 +8,11 @@ use Illuminate\Console\Command;
 class GenerateDocsCommand extends Command
 {
     /**
-     * The console command name.
+     * The console command signature .
      *
      * @var string
      */
-    protected $name = 'l5-swagger:generate';
+	protected $signature  = 'l5-swagger:generate {--group= : Documentation group\'s name}';
 
     /**
      * The console command description.
@@ -28,7 +28,18 @@ class GenerateDocsCommand extends Command
      */
     public function handle()
     {
-        $this->info('Regenerating docs');
-        Generator::generateDocs();
+        if ($this->option('group')) {
+            $this->info('Regenerating documentation group '.$this->option('group').'\'s docs');
+            Generator::generateDocs($this->option('group'));
+        } else {
+            $this->info('Regenerating docs');
+			if (config('l5-swagger.api.separated_doc')) {
+				foreach (config('l5-swagger.doc_groups', []) as $groupName => $group) {
+					Generator::generateDocs($groupName);
+				}
+			} else {
+				Generator::generateDocs();
+			}
+        }
     }
 }

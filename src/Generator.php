@@ -39,7 +39,7 @@ class Generator
     protected $constants;
 
     /**
-     * @var \Swagger\Annotations\Swagger
+     * @var \OpenApi\Annotations\Swagger
      */
     protected $swagger;
 
@@ -50,23 +50,32 @@ class Generator
 
     public function __construct()
     {
-        $this->appDir = config('l5-swagger.paths.annotations');
-        $this->docDir = config('l5-swagger.paths.docs');
-        $this->docsFile = $this->docDir.'/'.config('l5-swagger.paths.docs_json', 'api-docs.json');
-        $this->yamlDocsFile = $this->docDir.'/'.config('l5-swagger.paths.docs_yaml', 'api-docs.yaml');
-        $this->excludedDirs = config('l5-swagger.paths.excludes');
-        $this->constants = config('l5-swagger.constants') ?: [];
-        $this->yamlCopyRequired = config('l5-swagger.generate_yaml_copy', false);
+		$this->appDir = config('l5-swagger.paths.annotations');
+		$this->docDir = config('l5-swagger.paths.docs');
+		$this->docsFile = $this->docDir.'/'.config('l5-swagger.paths.docs_json', 'api-docs.json');
+		$this->yamlDocsFile = $this->docDir.'/'.config('l5-swagger.paths.docs_yaml', 'api-docs.yaml');
+		$this->excludedDirs = config('l5-swagger.paths.excludes');
+		$this->constants = config('l5-swagger.constants') ?: [];
+		$this->yamlCopyRequired = config('l5-swagger.generate_yaml_copy', false);
     }
 
-    public static function generateDocs()
+    public static function generateDocs($group = '')
     {
-        (new static)->prepareDirectory()
-            ->defineConstants()
-            ->scanFilesForDocumentation()
-            ->populateServers()
-            ->saveJson()
-            ->makeYamlCopy();
+        if($group){
+			(new static)->prepareDirectory($group)
+				->defineConstants($group)
+				->scanFilesForDocumentation($group)
+				->populateServers($group)
+				->saveJson($group)
+				->makeYamlCopy($group);
+		} else {
+			(new static)->prepareDirectory()
+				->defineConstants()
+				->scanFilesForDocumentation()
+				->populateServers()
+				->saveJson()
+				->makeYamlCopy();
+		}
     }
 
     /**
@@ -74,18 +83,33 @@ class Generator
      *
      * @return Generator
      */
-    protected function prepareDirectory()
+    protected function prepareDirectory($group = '')
     {
-        if (File::exists($this->docDir) && ! is_writable($this->docDir)) {
-            throw new L5SwaggerException('Documentation storage directory is not writable');
-        }
+        if($group){
+			$docDir = config('l5-swagger.paths.docs');
+			$docDir = config('l5-swagger.doc_groups.'.$group.'.paths.docs', $docDir);
+			if (File::exists($docDir) && ! is_writable($docDir)) {
+				throw new L5SwaggerException('Documentation storage directory is not writable');
+			}
 
-        // delete all existing documentation
-        if (File::exists($this->docDir)) {
-            File::deleteDirectory($this->docDir);
-        }
+			// delete all existing documentation
+			if (File::exists($docDir)) {
+				File::deleteDirectory($docDir);
+			}
 
-        File::makeDirectory($this->docDir);
+			File::makeDirectory($docDir);
+		} else {
+			if (File::exists($this->docDir) && ! is_writable($this->docDir)) {
+				throw new L5SwaggerException('Documentation storage directory is not writable');
+			}
+
+			// delete all existing documentation
+			if (File::exists($this->docDir)) {
+				File::deleteDirectory($this->docDir);
+			}
+
+			File::makeDirectory($this->docDir);
+		}
 
         return $this;
     }
@@ -95,13 +119,22 @@ class Generator
      *
      * @return Generator
      */
-    protected function defineConstants()
+    protected function defineConstants($group = '')
     {
-        if (! empty($this->constants)) {
-            foreach ($this->constants as $key => $value) {
-                defined($key) || define($key, $value);
-            }
-        }
+		if($group){
+			$constants = config('l5-swagger.doc_groups.'.$group.'.constants') ?: [];
+			if (! empty($constants)) {
+				foreach ($constants as $key => $value) {
+					defined($key) || define($key, $value);
+				}
+			}
+		} else {
+			if (! empty($this->constants)) {
+				foreach ($this->constants as $key => $value) {
+					defined($key) || define($key, $value);
+				}
+			}
+		}
 
         return $this;
     }
@@ -111,12 +144,37 @@ class Generator
      *
      * @return Generator
      */
-    protected function scanFilesForDocumentation()
+    protected function scanFilesForDocumentation($group = '')
     {
-        $this->swagger = \Swagger\scan(
-            $this->appDir,
-            ['exclude' => $this->excludedDirs]
-        );
+        if($group){
+			if ($this->isOpenApi()) {
+				$this->swagger = \OpenApi\scan(
+					config('l5-swagger.doc_groups.'.$group.'.paths.annotations'),
+					['exclude' => config('l5-swagger.doc_groups.'.$group.'.paths.excludes')]
+				);
+			}
+
+			if (! $this->isOpenApi()) {
+				$this->swagger = \Swagger\scan(
+					config('l5-swagger.doc_groups.'.$group.'.paths.annotations'),
+					['exclude' => config('l5-swagger.doc_groups.'.$group.'.paths.excludes')]
+				);
+			}
+		} else {
+			if ($this->isOpenApi()) {
+				$this->swagger = \OpenApi\scan(
+					$this->appDir,
+					['exclude' => $this->excludedDirs]
+				);
+			}
+
+			if (! $this->isOpenApi()) {
+				$this->swagger = \Swagger\scan(
+					$this->appDir,
+					['exclude' => $this->excludedDirs]
+				);
+			}
+		}
 
         return $this;
     }
@@ -126,19 +184,33 @@ class Generator
      *
      * @return Generator
      */
-    protected function populateServers()
+    protected function populateServers($group = '')
     {
-        if (config('l5-swagger.paths.base') !== null) {
-            if ($this->isOpenApi()) {
-                $this->swagger->servers = [
-                    new \Swagger\Annotations\Server(['url' => config('l5-swagger.paths.base')]),
-                ];
-            }
+        if($group){
+			if (config('l5-swagger.doc_groups.'.$group.'.paths.base') !== null) {
+				if ($this->isOpenApi($group)) {
+					$this->swagger->servers = [
+						new \OpenApi\Annotations\Server(['url' => config('l5-swagger.doc_groups.'.$group.'.paths.base')]),
+					];
+				}
 
-            if (! $this->isOpenApi()) {
-                $this->swagger->basePath = config('l5-swagger.paths.base');
-            }
-        }
+				if (! $this->isOpenApi($group)) {
+					$this->swagger->basePath = config('l5-swagger.doc_groups.'.$group.'..base');
+				}
+			}
+		} else {
+			if (config('l5-swagger.paths.base') !== null) {
+				if ($this->isOpenApi()) {
+					$this->swagger->servers = [
+						new \OpenApi\Annotations\Server(['url' => config('l5-swagger.paths.base')]),
+					];
+				}
+
+				if (! $this->isOpenApi()) {
+					$this->swagger->basePath = config('l5-swagger.paths.base');
+				}
+			}
+		}
 
         return $this;
     }
@@ -148,13 +220,23 @@ class Generator
      *
      * @return Generator
      */
-    protected function saveJson()
+    protected function saveJson($group = '')
     {
-        $this->swagger->saveAs($this->docsFile);
+		if($group){
+			$docDir = config('l5-swagger.paths.docs');
+			$docDir = config('l5-swagger.doc_groups.'.$group.'.paths.docs', $docDir);
+            $docsFile = $docDir.'/'.config('l5-swagger.doc_groups.'.$group.'.paths.docs_json', 'api-docs.json');
+			
+			$this->swagger->saveAs($docsFile);
 
-        $security = new SecurityDefinitions();
-        $security->generate($this->docsFile);
+			$security = new SecurityDefinitions();
+			$security->generate($docsFile);
+		} else {
+			$this->swagger->saveAs($this->docsFile);
 
+			$security = new SecurityDefinitions();
+			$security->generate($this->docsFile);
+		}
         return $this;
     }
 
@@ -163,13 +245,27 @@ class Generator
      *
      * @return Generator
      */
-    protected function makeYamlCopy()
+    protected function makeYamlCopy($group = '')
     {
-        if ($this->yamlCopyRequired) {
-            file_put_contents(
-                $this->yamlDocsFile,
-                (new YamlDumper(2))->dump(json_decode(file_get_contents($this->docsFile), true), 20)
-            );
+        if($group){
+			$docDir = config('l5-swagger.paths.docs');
+			$yamlCopyRequired = config('l5-swagger.doc_groups.'.$group.'.generate_yaml_copy', false);
+			$docDir = config('l5-swagger.doc_groups.'.$group.'.paths.docs', $docDir);
+            $docsFile = $docDir.'/'.config('l5-swagger.doc_groups.'.$group.'.paths.docs_json', 'api-docs.json');
+			$yamlDocsFile = $docDir.'/'.config('l5-swagger.doc_groups.'.$group.'.docs_yaml', 'api-docs.yaml');
+			if ($yamlCopyRequired) {
+				file_put_contents(
+					$yamlDocsFile,
+					(new YamlDumper(2))->dump(json_decode(file_get_contents($docsFile), true), 20)
+				);
+			}
+		} else {
+			if ($this->yamlCopyRequired) {
+				file_put_contents(
+					$this->yamlDocsFile,
+					(new YamlDumper(2))->dump(json_decode(file_get_contents($this->docsFile), true), 20)
+				);
+			}
         }
     }
 
@@ -178,8 +274,12 @@ class Generator
      *
      * @return bool
      */
-    protected function isOpenApi()
+    protected function isOpenApi($group = '')
     {
-        return version_compare(config('l5-swagger.swagger_version'), '3.0', '>=');
+		if($group){
+			return version_compare(config('l5-swagger.doc_groups.'.$group.'.swagger_version'), '3.0', '>=');
+		} else {
+			return version_compare(config('l5-swagger.swagger_version'), '3.0', '>=');
+		}
     }
 }

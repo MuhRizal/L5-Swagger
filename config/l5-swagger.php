@@ -8,9 +8,49 @@ return [
         |--------------------------------------------------------------------------
         */
 
-        'title' => 'L5 Swagger UI',
+        'title' => 'L5 Swagger UI',/*
+		
+        |--------------------------------------------------------------------------
+        | Is multiple separated documentation
+        |--------------------------------------------------------------------------
+        */
+        'separated_doc' => true,
     ],
 
+	/*
+    |--------------------------------------------------------------------------
+    | Configure separated documentation groups
+    |--------------------------------------------------------------------------
+    */
+    'doc_groups' => [
+        'v0' => [
+            'api' => [
+                'title' => 'V0 - Default L5 Swagger UI',
+            ],
+            'routes' => [
+                'api' => 'api_v0/documentation',
+				'oauth2_callback' => 'api_v0/oauth2-callback',
+				'middleware' => [
+					'api' => [],
+					'asset' => [],
+					'docs' => [],
+					'oauth2_callback' => [],
+				],
+            ],
+            'paths' => [
+                'docs' => storage_path('api-docs/v0'),
+                'docs_json' => 'api-docs-v0.json',
+                'annotations' => base_path('app'),
+				'excludes' => [ 
+				],
+            ],
+			'swagger_version' => env('SWAGGER_VERSION', '2.0'),
+			'constants' => [
+				'L5_SWAGGER_CONST_HOST' => env('L5_SWAGGER_CONST_HOST', 'http://my-default-host.com'),
+			],
+        ],
+    ],
+	
     'routes' => [
         /*
         |--------------------------------------------------------------------------
@@ -178,7 +218,7 @@ return [
     |--------------------------------------------------------------------------
     */
 
-    'swagger_version' => env('SWAGGER_VERSION', '2.0'),
+    'swagger_version' => env('SWAGGER_VERSION', '3.0'),
 
     /*
     |--------------------------------------------------------------------------
