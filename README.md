@@ -5,6 +5,10 @@
 [![StyleCI](https://styleci.io/repos/32315619/shield)](https://styleci.io/repos/32315619)
 [![Dependency Status](https://beta.gemnasium.com/badges/github.com/DarkaOnLine/L5-Swagger.svg)](https://beta.gemnasium.com/projects/github.com/DarkaOnLine/L5-Swagger)
 
+L5 Swagger Multidoc
+==========
+Multidoc inspired from https://github.com/rswork/L5-Swagger/tree/5.4.x-multidoc
+
 L5 Swagger
 ==========
 
